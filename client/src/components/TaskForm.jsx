@@ -15,7 +15,7 @@ const TaskForm = ({ taskId, initialTaskData = {}, onSubmit }) => {
   useEffect(() => {
     if (taskId) {
       // Fetch the existing task if updating
-      fetch(`/api/tasks/${taskId}`, {
+      fetch(`https://task-management-a4os.onrender.com/api/tasks/${taskId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       })
         .then((res) => res.json())
