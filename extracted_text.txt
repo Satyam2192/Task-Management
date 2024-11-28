@@ -1,0 +1,323 @@
+--- File: /home/sk/Desktop/task management app/server/server.js ---
+
+const express = require("express");
+const dotenv = require('dotenv');
+const cors = require('cors');
+const cookieParser = require("cookie-parser");
+const mongoose = require("mongoose");
+
+dotenv.config(); 
+
+const PORT = process.env.PORT || 3000; 
+
+mongoose.connect(process.env.MONGODB_URL)
+  .then(() => { console.log("db connected successfully") })
+  .catch((err) => {
+    console.log("err in connecting to database");
+    console.log(err);
+    process.exit(1);
+
+  });
+
+// const __dirname = path.resolve();
+
+const app = express();
+
+app.use(cors({
+  origin: '*',
+}));
+
+app.use(express.json({ limit: '50mb' })); 
+app.use(cookieParser());
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+
+// Routes import and mount
+const authRoutes = require('./routes/auth.routes');
+const taskRoutes = require('./routes/task.routes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/tasks', taskRoutes);
+
+
+
+--- File: /home/sk/Desktop/task management app/server/.env ---
+
+MONGODB_URL=mongodb+srv://Satyam21092:cd2aNoCf5MtuE26q@cluster1.w3gyq5v.mongodb.net/TaskManager1
+JWT_SECRET=Sk
+PORT=7000
+
+
+--- File: /home/sk/Desktop/task management app/server/controllers/task.controller.js ---
+
+const Task = require('../models/task.model');
+
+exports.getTasks = async (req, res) => {
+  const { priority, status } = req.query;
+
+  try {
+    const filters = { userId: req.user.id };
+    if (priority) filters.priority = Number(priority);
+    if (status) filters.status = status;
+
+    const tasks = await Task.find(filters).sort({ startTime: 1 });
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch tasks' });
+  }
+};
+
+exports.addTask = async (req, res) => {
+  const { title, startTime, endTime, priority, status } = req.body;
+  
+  try {
+    const existingTask = await Task.findOne({ title, userId: req.user.id });
+    if (existingTask) {
+      return res.status(400).json({ message: 'Task with this title already exists' });
+    }
+
+    // Ensure startTime and endTime are valid Date objects
+    const parsedStartTime = new Date(startTime);
+    const parsedEndTime = new Date(endTime);
+
+    if (isNaN(parsedStartTime) || isNaN(parsedEndTime)) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+
+    const task = new Task({
+      title,
+      startTime: parsedStartTime,
+      endTime: parsedEndTime,
+      priority,
+      status,
+      userId: req.user.id
+    });
+    
+    await task.save();
+    res.status(201).json(task);
+  } catch (error) {
+    res.status(400).json({ message: 'Invalid input' });
+  }
+};
+
+
+  exports.getTaskWithId = async (req, res) => {
+    const { id } = req.params;
+  
+    try {
+      const task = await Task.findOne({ _id: id, userId: req.user.id });
+      if (!task) return res.status(404).json({ message: 'Task not found' });
+  
+      res.json(task);
+    } catch (error) {
+      res.status(400).json({ message: 'Failed to retrieve task' });
+    }
+  };
+  
+
+  exports.updateTask = async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+  
+    // Ensure startTime and endTime are valid if provided in the update
+    if (updates.startTime) {
+      const parsedStartTime = new Date(updates.startTime);
+      if (isNaN(parsedStartTime)) {
+        return res.status(400).json({ message: 'Invalid startTime format' });
+      }
+      updates.startTime = parsedStartTime;
+    }
+  
+    if (updates.endTime) {
+      const parsedEndTime = new Date(updates.endTime);
+      if (isNaN(parsedEndTime)) {
+        return res.status(400).json({ message: 'Invalid endTime format' });
+      }
+      updates.endTime = parsedEndTime;
+    }
+  
+    try {
+      const task = await Task.findOneAndUpdate(
+        { _id: id, userId: req.user.id },
+        updates,
+        { new: true }
+      );
+      
+      if (!task) return res.status(404).json({ message: 'Task not found' });
+  
+      res.json(task);
+    } catch (error) {
+      res.status(400).json({ message: 'Failed to update task' });
+    }
+  };
+  
+exports.deleteTask = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const task = await Task.findOneAndDelete({ _id: id, userId: req.user.id });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    res.json({ message: 'Task deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete task' });
+  }
+};
+
+exports.getStatistics = async (req, res) => {
+    try {
+      const tasks = await Task.find({ userId: req.user.id });
+  
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(task => task.status === 'finished').length;
+      const pendingTasks = totalTasks - completedTasks;
+  
+      const totalCompletionTime = tasks
+        .filter(task => task.status === 'finished')
+        .reduce((sum, task) => sum + (new Date(task.endTime) - new Date(task.startTime)) / 3600000, 0);
+  
+      const pendingTimeStats = tasks
+        .filter(task => task.status === 'pending')
+        .reduce(
+          (stats, task) => {
+            const timeElapsed = Math.max((new Date() - new Date(task.startTime)) / 3600000, 0);
+            const balanceEstimate = Math.max((new Date(task.endTime) - new Date()) / 3600000, 0);
+            stats.timeElapsed += timeElapsed;
+            stats.balanceEstimate += balanceEstimate;
+            return stats;
+          },
+          { timeElapsed: 0, balanceEstimate: 0 }
+        );
+  
+      const averageCompletionTime = completedTasks > 0 ? totalCompletionTime / completedTasks : 0;
+  
+      res.json({
+        totalTasks,
+        completedTasks,
+        pendingTasks,
+        completedPercentage: (completedTasks / totalTasks) * 100 || 0,
+        pendingPercentage: (pendingTasks / totalTasks) * 100 || 0,
+        ...pendingTimeStats,
+        averageCompletionTime
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch statistics' });
+    }
+  };
+  
+
+--- File: /home/sk/Desktop/task management app/server/controllers/auth.controller.js ---
+
+const User = require('../models/user.model.js');
+const bcryptjs= require('bcryptjs');
+const { errorHandler } =require('../utils/error.js');
+const jwt = require('jsonwebtoken');
+
+module.exports.signup = async (req, res, next) => {
+    const { username, email, password } = req.body;
+    
+    try {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'User with this email already exists' });
+      }
+  
+      const hashedPassword = bcryptjs.hashSync(password, 10);
+      const newUser = new User({ username, email, password: hashedPassword });
+      
+      await newUser.save();
+      res.status(201).json('User created successfully!');
+    } catch (error) {
+      next(error);
+    }
+  };
+
+module.exports.login = async (req, res, next) => {
+  const { email, password } = req.body;
+  try {
+    const validUser = await User.findOne({ email });
+    if (!validUser) return next(errorHandler(404, 'User not found!'));
+    const validPassword = bcryptjs.compareSync(password, validUser.password);
+    if (!validPassword) return next(errorHandler(401, 'Wrong credentials!'));
+    const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET);
+    const { password: pass, ...rest } = validUser._doc;
+    res
+      .cookie('access_token', token, { httpOnly: true })
+      .status(200)
+      .json(rest);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports.signOut = async (req, res, next) => {
+  try {
+    res.clearCookie('access_token');
+    res.status(200).json('User has been logged out!');
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+--- File: /home/sk/Desktop/task management app/server/utils/verifyUser.js ---
+
+const jwt = require('jsonwebtoken');
+const { errorHandler } = require('./error.js');
+
+module.exports.verifyToken = (req, res, next) => {
+  const token = req.cookies.access_token;
+
+  if (!token) return next(errorHandler(401, 'Unauthorized'));
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return next(errorHandler(403, 'Forbidden'));
+
+    req.user = user;
+    next();
+  });
+};
+
+
+--- File: /home/sk/Desktop/task management app/server/utils/error.js ---
+
+module.exports.errorHandler = (statusCode, message) => {
+  const error = new Error();
+  error.statusCode = statusCode;
+  error.message = message;
+  return error;
+};
+
+
+--- File: /home/sk/Desktop/task management app/server/routes/task.routes.js ---
+
+const express = require('express');
+const { getTasks, addTask, updateTask, getTaskWithId, deleteTask, getStatistics } = require('../controllers/task.controller');
+const { verifyToken } = require('../utils/verifyUser.js');
+
+const router = express.Router();
+
+router.get('/statistics', verifyToken, getStatistics);
+router.get('/', verifyToken, getTasks);
+router.post('/', verifyToken, addTask);
+router.get('/:id', verifyToken, getTaskWithId);
+router.put('/:id', verifyToken, updateTask);
+router.delete('/:id', verifyToken, deleteTask);
+
+module.exports = router;
+
+--- File: /home/sk/Desktop/task management app/server/routes/auth.routes.js ---
+
+const express = require('express');
+const { signOut, login, signup } = require('../controllers/auth.controller.js');
+
+const router = express.Router();
+
+router.post("/signup", signup);
+router.post("/login", login);
+router.get('/signout', signOut)
+
+module.exports = router;
+
