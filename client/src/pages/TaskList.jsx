@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 const TaskList = () => {
   const dispatch = useDispatch();
-  const tasks = useSelector((state) => state.tasks?.items || []); 
+  const tasks = useSelector((state) => state.tasks?.items || []); // Safeguard with default empty array
   const taskStatus = useSelector((state) => state.tasks?.status || "idle");
   const error = useSelector((state) => state.tasks?.error || null);
   const [priorityFilter, setPriorityFilter] = useState("");

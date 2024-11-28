@@ -6,7 +6,6 @@ import {
   signInSuccess,
   signInFailure,
 } from '../redux/user/userSlice.js';
-import Loader from '../components/Loader.jsx';
 
 export default function LogIn() {
   const [formData, setFormData] = useState({});
@@ -87,7 +86,7 @@ export default function LogIn() {
               className="w-full block bg-[#059669] hover:bg-[#059669] focus:bg-[#059669] text-white font-semibold rounded-lg px-4 py-3 mt-6"
             >
               {loading ? (
-                <Loader />
+                "Loding..."
               ) : (
                 'Sign In'
               )}
