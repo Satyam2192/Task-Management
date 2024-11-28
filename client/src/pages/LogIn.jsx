@@ -46,7 +46,7 @@ export default function LogIn() {
     <section className="flex flex-col md:flex-row h-screen items-center">
 
       <div className="bg-indigo-600 hidden lg:block w-full md:w-1/2 xl:w-2/3 h-screen">
-        <img src="https://source.unsplash.com/random/900x700/?villa" alt="" className="w-full h-full object-cover" />
+        <img src="https://plus.unsplash.com/premium_photo-1683749810514-860f96ad0735" alt="" className="w-full h-full object-cover" />
       </div>
 
       <div className="bg-white w-full md:max-w-md lg:max-w-full md:mx-auto md:w-1/2 xl:w-1/3 h-screen px-6 lg:px-16 xl:px-12
