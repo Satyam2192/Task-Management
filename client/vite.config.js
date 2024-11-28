@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://task-management-a4os.onrender.com/",
+        target: "https://task-management-a4os.onrender.com",
         changeOrigin: true,
         secure: false,
       },
