@@ -40,12 +40,11 @@ This is a full-stack task management application built with React, Redux Toolkit
 * cors
 * dotenv
 
-
-
 ## Installation and Setup
 
-**Backend:**
+- `git clone https://github.com/Satyam2192/Task-Management.git`
 
+**Backend:**
 1. Navigate to the `server` directory: `cd server`
 2. Install dependencies: `npm install`
 3. Create a `.env` file in the `server` directory and add the following environment variables, replacing placeholders with your actual values:

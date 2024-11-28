@@ -26,7 +26,7 @@ A full-stack task management application that allows users to create, track, and
 
 1. Clone the repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/Satyam2192/Task-Management.git
 cd task-management-app
 ```
 
