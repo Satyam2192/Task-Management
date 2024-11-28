@@ -41,7 +41,7 @@ def extract_text_from_folder(folder_path, output_file, files_to_skip=None, folde
                     print(f"Error processing {file_path}: {e}")
 
 if __name__ == "__main__":
-    folder_to_extract = "/home/sk/Desktop/task management app/client/src"
+    folder_to_extract = "/home/sk/Desktop/task management app/server"
     output_text_file = "extracted_text.txt" 
     files_to_skip = ["LogIn.jsx", "SignUp.jsx","EDA.ipynb","evaluate.ipynb","textScript.py","stock_price.csv","README.md","globals.css","auto_complete.json", "another_file.css", "LogoBadge.svelte","README.md",".gitignore","package-lock.json","package.json"]
     folders_to_skip = ["results","models","notebooks","data","env","__pycache__","resetpassword","login","register","assets","icon", "asset", "node_modules",".git"]  

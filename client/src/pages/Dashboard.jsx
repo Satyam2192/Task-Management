@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Loader from "../components/Loader";
 
 const Dashboard = () => {
   const [summary, setSummary] = useState(null);
@@ -33,12 +34,7 @@ const Dashboard = () => {
 
   // Loading state
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full border-purple-600 border-t-transparent"></div>
-        <p className="ml-4 text-gray-600">Loading...</p>
-      </div>
-    );
+    <Loader/>
   }
 
   // Error state
@@ -61,9 +57,7 @@ const Dashboard = () => {
   // No data available state
   if (!summary) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p className="text-gray-600">No data available.</p>
-      </div>
+      <Loader />
     );
   }
 
