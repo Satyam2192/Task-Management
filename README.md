@@ -1,71 +1,54 @@
 # Task Management App
 
-This is a full-stack task management application built with React, Redux Toolkit, Tailwind CSS on the frontend and Node.js, Express, and MongoDB on the backend.  It allows users to manage their tasks efficiently, including creating, updating, deleting, filtering, sorting, and viewing statistics on task completion progress.
+Full-stack task management application with React, Redux Toolkit, and Node.js.
+
+- Live: https://task-management-three-lovat.vercel.app/
 
 ## Features
 
-* **User Authentication:** Secure user registration and login with JWT (JSON Web Tokens).
-* **Task Management:**
-    * Create tasks with title, start time, end time, priority (1-5), and status (pending/finished).
-    * Update task details, including marking tasks as complete and adjusting the end time.
-    * Delete tasks.
-    * Filter tasks by priority and status.
-    * Sort tasks by start and end time.
-* **Dashboard with Statistics:**
-    * Total task count.
-    * Percentage of completed and pending tasks.
-    * Time lapsed and remaining estimated time for pending tasks, broken down by priority.
-    * Overall average completion time.
-* **Protected Routes:**  Ensures only authenticated users can access task management features.
-* **Redux Toolkit for State Management:**  Manages application state efficiently and predictably.
-
+* User Authentication (JWT)
+* Task Creation, Update, Delete
+* Task Filtering and Sorting
+* Dashboard Statistics
+* Protected Routes
 
 ## Tech Stack
 
 **Frontend:**
-
 * React
 * Redux Toolkit
 * React Router DOM
 * Tailwind CSS
 
 **Backend:**
-
 * Node.js
 * Express
 * MongoDB
-* JWT (jsonwebtoken)
+* JWT
 * bcryptjs
-* cookie-parser
-* cors
-* dotenv
 
-## Installation and Setup
-
-- `git clone https://github.com/Satyam2192/Task-Management.git`
+## Installation
 
 **Backend:**
-1. Navigate to the `server` directory: `cd server`
-2. Install dependencies: `npm install`
-3. Create a `.env` file in the `server` directory and add the following environment variables, replacing placeholders with your actual values:
+1. Clone repository
+2. Navigate to `server` directory
+3. Install dependencies: `npm install`
+4. Create `.env` file with:
     ```
-    MONGODB_URL=<your_mongodb_connection_string>
-    JWT_SECRET=<your_jwt_secret_key>
-    PORT=<your_port_number> 
+    MONGODB_URL=<mongodb_connection_string>
+    JWT_SECRET=<jwt_secret_key>
+    PORT=<port_number>
     ```
-4. Start the server: `npm start`
+5. Start server: `npm start`
 
 **Frontend:**
-
-1. Navigate to the `client` directory: `cd client`
+1. Navigate to `client` directory
 2. Install dependencies: `npm install`
-3. Start the development server: `npm start`
+3. Start development server: `npm start`
 
 ## Usage
 
-1. Register a new account or log in with existing credentials.
-2. Navigate to the dashboard to view task statistics.
-3. Use the "Task List" page to manage your tasks.
-4. Create new tasks using the "Add Task" page.
-5. Update existing tasks by clicking the "Edit" button on the task list.
-
+1. Register or login
+2. View dashboard statistics
+3. Manage tasks (create, update, delete)
+4. Filter and sort tasks as needed
