@@ -1,139 +1,80 @@
-# Task Management API Documentation
+# Task Management Application
 
-## Authentication Endpoints
+## Overview
+A full-stack task management application that allows users to create, track, and manage their tasks with comprehensive statistics and authentication.
 
-### Register a New User
-- **Endpoint:** `POST /api/auth/register`
-- **Description:** Register a new user account
-- **Request Body:**
-  ```json
-  {
-    "email": "user@example.com",
-    "password": "strongpassword"
-  }
-  ```
-- **Success Response:** 
-  - **Code:** 201 Created
-  - **Content:** `{ "message": "User registered successfully" }`
-- **Error Response:** 
-  - **Code:** 400 Bad Request
-  - **Content:** `{ "message": "User already exists or invalid input" }`
+## Features
+- User Authentication (Signup/Login)
+- Task CRUD Operations
+- Task Filtering and Sorting
+- Detailed Task Statistics Dashboard
+- Secure User-specific Task Management
 
-### User Login
-- **Endpoint:** `POST /api/auth/login`
-- **Description:** Authenticate user and receive JWT token
-- **Request Body:**
-  ```json
-  {
-    "email": "user@example.com",
-    "password": "strongpassword"
-  }
-  ```
-- **Success Response:** 
-  - **Code:** 200 OK
-  - **Content:** `{ "token": "jwt_token_here" }`
-- **Error Response:** 
-  - **Code:** 401 Unauthorized
-  - **Content:** `{ "message": "Invalid email or password" }`
+## Tech Stack
+- **Backend:** 
+  - Node.js
+  - Express.js
+  - MongoDB
+  - JWT Authentication
 
-## Task Endpoints
+## Prerequisites
+- Node.js (v14 or later)
+- MongoDB
+- npm or yarn
 
-### Get Tasks
-- **Endpoint:** `GET /api/tasks`
-- **Description:** Retrieve tasks for the authenticated user
-- **Query Parameters:**
-  - `priority` (optional): Filter tasks by priority (number)
-  - `status` (optional): Filter tasks by status
-- **Headers:** 
-  - `Authorization: Bearer <jwt_token>`
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** Array of task objects
-- **Error Response:**
-  - **Code:** 500 Internal Server Error
-  - **Content:** `{ "message": "Failed to fetch tasks" }`
+## Installation
 
-### Add New Task
-- **Endpoint:** `POST /api/tasks`
-- **Description:** Create a new task for the authenticated user
-- **Headers:** 
-  - `Authorization: Bearer <jwt_token>`
-- **Request Body:**
-  ```json
-  {
-    "title": "Task Title",
-    "startTime": "2024-01-01T00:00:00Z",
-    "endTime": "2024-01-02T00:00:00Z",
-    "priority": 1,
-    "status": "pending"
-  }
-  ```
-- **Success Response:** 
-  - **Code:** 201 Created
-  - **Content:** Created task object
-- **Error Response:**
-  - **Code:** 400 Bad Request
-  - **Content:** 
-    - `{ "message": "Task with this title already exists" }`
-    - `{ "message": "Invalid input" }`
+1. Clone the repository
+```bash
+git clone <repository-url>
+cd task-management-app
+```
 
-### Update Task
-- **Endpoint:** `PUT /api/tasks/:id`
-- **Description:** Update an existing task
-- **Headers:** 
-  - `Authorization: Bearer <jwt_token>`
-- **Request Body:** (partial update supported)
-  ```json
-  {
-    "title": "Updated Task Title",
-    "status": "finished"
-  }
-  ```
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** Updated task object
-- **Error Response:**
-  - **Code:** 404 Not Found
-  - **Content:** `{ "message": "Task not found" }`
-  - **Code:** 400 Bad Request
-  - **Content:** `{ "message": "Failed to update task" }`
+2. Install backend dependencies
+```bash
+cd server
+npm install
+```
 
-### Delete Task
-- **Endpoint:** `DELETE /api/tasks/:id`
-- **Description:** Delete a specific task
-- **Headers:** 
-  - `Authorization: Bearer <jwt_token>`
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `{ "message": "Task deleted" }`
-- **Error Response:**
-  - **Code:** 404 Not Found
-  - **Content:** `{ "message": "Task not found" }`
-  - **Code:** 500 Internal Server Error
-  - **Content:** `{ "message": "Failed to delete task" }`
+3. Configure Environment Variables
+Create a `.env` file in the `server` directory with:
+```
+MONGODB_URL=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+PORT=7000
+```
 
-### Get Task Statistics
-- **Endpoint:** `GET /api/tasks/statistics`
-- **Description:** Retrieve comprehensive task statistics for the authenticated user
-- **Headers:** 
-  - `Authorization: Bearer <jwt_token>`
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:**
-    ```json
-    {
-      "totalTasks": 10,
-      "completedTasks": 5,
-      "pendingTasks": 5,
-      "completedPercentage": 50,
-      "pendingPercentage": 50,
-      "timeElapsed": 12.5,
-      "balanceEstimate": 24.3,
-      "averageCompletionTime": 2.5
-    }
-    ```
-- **Error Response:**
-  - **Code:** 500 Internal Server Error
-  - **Content:** `{ "message": "Failed to fetch statistics" }`
+4. Start the Server
+```bash
+npm start
+```
 
+## API Endpoints
 
+### Authentication
+- `POST /api/auth/signup` - User Registration
+- `POST /api/auth/login` - User Login
+- `GET /api/auth/signout` - User Logout
+
+### Tasks
+- `GET /api/tasks` - Retrieve Tasks
+- `POST /api/tasks` - Create Task
+- `GET /api/tasks/:id` - Get Specific Task
+- `PUT /api/tasks/:id` - Update Task
+- `DELETE /api/tasks/:id` - Delete Task
+- `GET /api/tasks/statistics` - Get Task Statistics
+
+## Task Model
+- Title
+- Start Time
+- End Time
+- Priority (1-5)
+- Status (pending/finished)
+
+## Dashboard Statistics
+- Total Tasks
+- Completed/Pending Task Percentages
+- Time Elapsed for Pending Tasks
+- Estimated Remaining Time
+- Average Completion Time
+- Priority-based Task Breakdown

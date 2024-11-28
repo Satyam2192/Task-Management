@@ -1,323 +1,859 @@
---- File: /home/sk/Desktop/task management app/server/server.js ---
+--- File: /home/sk/Desktop/task management app/client/src/main.jsx ---
 
-const express = require("express");
-const dotenv = require('dotenv');
-const cors = require('cors');
-const cookieParser = require("cookie-parser");
-const mongoose = require("mongoose");
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { Provider } from 'react-redux';
+import App from './App.jsx';
+import { store } from './redux/store';
+import './index.css';
 
-dotenv.config(); 
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <Provider store={store}>
+      <App />
+    </Provider>
+  </React.StrictMode>
+);
 
-const PORT = process.env.PORT || 3000; 
 
-mongoose.connect(process.env.MONGODB_URL)
-  .then(() => { console.log("db connected successfully") })
-  .catch((err) => {
-    console.log("err in connecting to database");
-    console.log(err);
-    process.exit(1);
+--- File: /home/sk/Desktop/task management app/client/src/App.jsx ---
 
-  });
+import React from "react";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import Header from "./components/Header";
+import Dashboard from "./pages/Dashboard";
+import TaskList from "./pages/TaskList";
+import AddTask from "./pages/AddTask";
+import UpdateTask from "./pages/UpdateTask";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import LogIn from "./pages/LogIn";
+import SignUp from "./pages/SignUp";
 
-// const __dirname = path.resolve();
+const App = () => {
+  const isAuthenticated = useSelector((state) => !!state.user.currentUser);
 
-const app = express();
+  return (
+    <BrowserRouter>
+      <Header />
+      <Routes>
+        
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/login" element={<LogIn />} />
 
-app.use(cors({
-  origin: '*',
-}));
+        <Route
+          path="/"
+          element={<ProtectedRoute Component={Dashboard} />}
+        />
+        <Route
+          path="/tasklist"
+          element={<ProtectedRoute Component={TaskList} />}
+        />
+        <Route
+          path="/addtask"
+          element={<ProtectedRoute Component={AddTask} />}
+        />
+        <Route
+          path="/updatetask/:id"
+          element={<ProtectedRoute Component={UpdateTask} />}
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+};
 
-app.use(express.json({ limit: '50mb' })); 
-app.use(cookieParser());
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+export default App;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/index.css ---
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+--- File: /home/sk/Desktop/task management app/client/src/redux/store.js ---
+
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import userReducer from './user/userSlice';
+import taskReducer from './slices/taskSlice'; 
+import { persistReducer, persistStore } from 'redux-persist';
+import storage from 'redux-persist/lib/storage';
+
+const rootReducer = combineReducers({
+  user: userReducer,
+  tasks: taskReducer, 
 });
 
-
-// Routes import and mount
-const authRoutes = require('./routes/auth.routes');
-const taskRoutes = require('./routes/task.routes');
-
-app.use('/api/auth', authRoutes);
-app.use('/api/tasks', taskRoutes);
-
-
-
---- File: /home/sk/Desktop/task management app/server/.env ---
-
-MONGODB_URL=mongodb+srv://Satyam21092:cd2aNoCf5MtuE26q@cluster1.w3gyq5v.mongodb.net/TaskManager1
-JWT_SECRET=Sk
-PORT=7000
-
-
---- File: /home/sk/Desktop/task management app/server/controllers/task.controller.js ---
-
-const Task = require('../models/task.model');
-
-exports.getTasks = async (req, res) => {
-  const { priority, status } = req.query;
-
-  try {
-    const filters = { userId: req.user.id };
-    if (priority) filters.priority = Number(priority);
-    if (status) filters.status = status;
-
-    const tasks = await Task.find(filters).sort({ startTime: 1 });
-    res.json(tasks);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch tasks' });
-  }
+const persistConfig = {
+  key: 'root',
+  storage,
+  version: 1,
 };
 
-exports.addTask = async (req, res) => {
-  const { title, startTime, endTime, priority, status } = req.body;
-  
+const persistedReducer = persistReducer(persistConfig, rootReducer);
+
+export const store = configureStore({
+  reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: false,
+    }),
+});
+
+export const persistor = persistStore(store);
+
+
+--- File: /home/sk/Desktop/task management app/client/src/redux/slices/taskSlice.js ---
+
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+
+export const fetchTasks = createAsyncThunk('tasks/fetchTasks', async (_, thunkAPI) => {
   try {
-    const existingTask = await Task.findOne({ title, userId: req.user.id });
-    if (existingTask) {
-      return res.status(400).json({ message: 'Task with this title already exists' });
-    }
-
-    // Ensure startTime and endTime are valid Date objects
-    const parsedStartTime = new Date(startTime);
-    const parsedEndTime = new Date(endTime);
-
-    if (isNaN(parsedStartTime) || isNaN(parsedEndTime)) {
-      return res.status(400).json({ message: 'Invalid date format' });
-    }
-
-    const task = new Task({
-      title,
-      startTime: parsedStartTime,
-      endTime: parsedEndTime,
-      priority,
-      status,
-      userId: req.user.id
+    const response = await fetch('/api/tasks', {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
     });
-    
-    await task.save();
-    res.status(201).json(task);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error:', errorText);
+      throw new Error(errorText);
+    }
+    return await response.json();
   } catch (error) {
-    res.status(400).json({ message: 'Invalid input' });
+    console.error('Fetch Tasks Error:', error.message); 
+    return thunkAPI.rejectWithValue(error.message);
   }
-};
+});
 
-
-  exports.getTaskWithId = async (req, res) => {
-    const { id } = req.params;
-  
-    try {
-      const task = await Task.findOne({ _id: id, userId: req.user.id });
-      if (!task) return res.status(404).json({ message: 'Task not found' });
-  
-      res.json(task);
-    } catch (error) {
-      res.status(400).json({ message: 'Failed to retrieve task' });
-    }
-  };
-  
-
-  exports.updateTask = async (req, res) => {
-    const { id } = req.params;
-    const updates = req.body;
-  
-    // Ensure startTime and endTime are valid if provided in the update
-    if (updates.startTime) {
-      const parsedStartTime = new Date(updates.startTime);
-      if (isNaN(parsedStartTime)) {
-        return res.status(400).json({ message: 'Invalid startTime format' });
-      }
-      updates.startTime = parsedStartTime;
-    }
-  
-    if (updates.endTime) {
-      const parsedEndTime = new Date(updates.endTime);
-      if (isNaN(parsedEndTime)) {
-        return res.status(400).json({ message: 'Invalid endTime format' });
-      }
-      updates.endTime = parsedEndTime;
-    }
-  
-    try {
-      const task = await Task.findOneAndUpdate(
-        { _id: id, userId: req.user.id },
-        updates,
-        { new: true }
-      );
-      
-      if (!task) return res.status(404).json({ message: 'Task not found' });
-  
-      res.json(task);
-    } catch (error) {
-      res.status(400).json({ message: 'Failed to update task' });
-    }
-  };
-  
-exports.deleteTask = async (req, res) => {
-  const { id } = req.params;
-
+export const addTask = createAsyncThunk('tasks/addTask', async (taskData, thunkAPI) => {
   try {
-    const task = await Task.findOneAndDelete({ _id: id, userId: req.user.id });
-    if (!task) return res.status(404).json({ message: 'Task not found' });
-
-    res.json({ message: 'Task deleted' });
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(taskData),
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    return await response.json();
   } catch (error) {
-    res.status(500).json({ message: 'Failed to delete task' });
+    return thunkAPI.rejectWithValue(error.message);
   }
+});
+
+export const deleteTask = createAsyncThunk('tasks/deleteTask', async (taskId, thunkAPI) => {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    return taskId;
+  } catch (error) {
+    return thunkAPI.rejectWithValue(error.message);
+  }
+});
+
+const taskSlice = createSlice({
+  name: 'tasks',
+  initialState: {
+    items: [], // Ensure items is initialized as an empty array
+    status: 'idle', // Initial status is idle
+    error: null, // Initialize error as null
+  },
+  reducers: {
+    clearError(state) {
+      state.error = null; // Clear any error message
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchTasks.pending, (state) => {
+        state.status = 'loading'; // Set status to loading when fetching
+      })
+      .addCase(fetchTasks.fulfilled, (state, action) => {
+        state.status = 'succeeded'; // Set status to succeeded when fetching is successful
+        state.items = action.payload; // Populate the items with the fetched data
+      })
+      .addCase(fetchTasks.rejected, (state, action) => {
+        state.status = 'failed'; // Set status to failed if the fetching fails
+        state.error = action.payload; // Set error with the message
+      })
+      .addCase(deleteTask.fulfilled, (state, action) => {
+        state.items = state.items.filter((task) => task.id !== action.payload); 
+      })
+      .addCase(addTask.fulfilled, (state, action) => {
+        state.items = [...state.items, action.payload]; 
+      })
+
+  },
+});
+
+export const { clearError } = taskSlice.actions;
+
+export default taskSlice.reducer;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/redux/user/userSlice.js ---
+
+import { createSlice } from '@reduxjs/toolkit';
+
+const initialState = {
+  currentUser: null,
+  error: null,
+  loading: false,
 };
 
-exports.getStatistics = async (req, res) => {
-    try {
-      const tasks = await Task.find({ userId: req.user.id });
-  
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter(task => task.status === 'finished').length;
-      const pendingTasks = totalTasks - completedTasks;
-  
-      const totalCompletionTime = tasks
-        .filter(task => task.status === 'finished')
-        .reduce((sum, task) => sum + (new Date(task.endTime) - new Date(task.startTime)) / 3600000, 0);
-  
-      const pendingTimeStats = tasks
-        .filter(task => task.status === 'pending')
-        .reduce(
-          (stats, task) => {
-            const timeElapsed = Math.max((new Date() - new Date(task.startTime)) / 3600000, 0);
-            const balanceEstimate = Math.max((new Date(task.endTime) - new Date()) / 3600000, 0);
-            stats.timeElapsed += timeElapsed;
-            stats.balanceEstimate += balanceEstimate;
-            return stats;
-          },
-          { timeElapsed: 0, balanceEstimate: 0 }
-        );
-  
-      const averageCompletionTime = completedTasks > 0 ? totalCompletionTime / completedTasks : 0;
-  
-      res.json({
-        totalTasks,
-        completedTasks,
-        pendingTasks,
-        completedPercentage: (completedTasks / totalTasks) * 100 || 0,
-        pendingPercentage: (pendingTasks / totalTasks) * 100 || 0,
-        ...pendingTimeStats,
-        averageCompletionTime
+const userSlice = createSlice({
+  name: 'user',
+  initialState,
+  reducers: {
+    signInStart: (state) => {
+      state.loading = true;
+    },
+    signInSuccess: (state, action) => {
+      state.currentUser = action.payload;
+      state.loading = false;
+      state.error = null;
+    },
+    signInFailure: (state, action) => {
+      state.error = action.payload;
+      state.loading = false;
+    },
+    updateUserStart: (state) => {
+      state.loading = true;
+    },
+    updateUserSuccess: (state, action) => {
+      state.currentUser = action.payload;
+      state.loading = false;
+      state.error = null;
+    },
+    updateUserFailure: (state, action) => {
+      state.error = action.payload;
+      state.loading = false;
+    },
+    deleteUserStart: (state) => {
+      state.loading = true;
+    },
+    deleteUserSuccess: (state) => {
+      state.currentUser = null;
+      state.loading = false;
+      state.error = null;
+    },
+    deleteUserFailure: (state, action) => {
+      state.error = action.payload;
+      state.loading = false;
+    },
+    signOutUserStart: (state) => {
+      state.loading = true;
+    },
+    signOutUserSuccess: (state) => {
+      state.currentUser = null;
+      state.loading = false;
+      state.error = null;
+    },
+    signOutUserFailure: (state, action) => {
+      state.error = action.payload;
+      state.loading = false;
+    },
+  },
+});
+
+export const {
+  signInStart,
+  signInSuccess,
+  signInFailure,
+  updateUserFailure,
+  updateUserSuccess,
+  updateUserStart,
+  deleteUserFailure,
+  deleteUserSuccess,
+  deleteUserStart,
+  signOutUserFailure,
+  signOutUserSuccess,
+  signOutUserStart,
+} = userSlice.actions;
+
+export default userSlice.reducer;
+
+--- File: /home/sk/Desktop/task management app/client/src/pages/UpdateTask.jsx ---
+
+import React from "react";
+import { useParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { fetchTasks } from "../redux/slices/taskSlice";
+import TaskForm from "../components/TaskForm";
+
+const UpdateTask = () => {
+  const { id } = useParams();
+  const dispatch = useDispatch();
+
+  const handleUpdateTask = (taskData) => {
+    const formattedTaskData = {
+      ...taskData,
+      startTime: new Date(taskData.startTime).toISOString().slice(0, 16),
+      endTime: new Date(taskData.endTime).toISOString().slice(0, 16),
+    };
+    return fetch(`/api/tasks/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(formattedTaskData),
+    }).then((response) => {
+      if (response.ok) {
+        dispatch(fetchTasks());
+        alert("Task updated successfully!");
+      } else {
+        return response.json().then((err) => alert(err.message));
+      }
+    });
+  };
+
+  return <TaskForm taskId={id} onSubmit={handleUpdateTask} />;
+};
+
+export default UpdateTask;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/pages/TaskList.jsx ---
+
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchTasks, deleteTask } from "../redux/slices/taskSlice";
+import { useNavigate } from "react-router-dom";
+
+const TaskList = () => {
+  const dispatch = useDispatch();
+  const tasks = useSelector((state) => state.tasks?.items || []); // Safeguard with default empty array
+  const taskStatus = useSelector((state) => state.tasks?.status || "idle");
+  const error = useSelector((state) => state.tasks?.error || null);
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortOption, setSortOption] = useState("");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (taskStatus === "idle") {
+      dispatch(fetchTasks());
+    }
+  }, [dispatch, taskStatus]);
+
+  const handleDelete = (taskId) => {
+    if (window.confirm("Are you sure you want to delete this task?")) {
+      dispatch(deleteTask(taskId)).then(() => {
+        dispatch(fetchTasks()); 
       });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch statistics' });
     }
   };
-  
 
---- File: /home/sk/Desktop/task management app/server/controllers/auth.controller.js ---
-
-const User = require('../models/user.model.js');
-const bcryptjs= require('bcryptjs');
-const { errorHandler } =require('../utils/error.js');
-const jwt = require('jsonwebtoken');
-
-module.exports.signup = async (req, res, next) => {
-    const { username, email, password } = req.body;
-    
-    try {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'User with this email already exists' });
+  const filteredTasks = tasks
+    .filter(
+      (task) =>
+        (priorityFilter ? task.priority === Number(priorityFilter) : true) &&
+        (statusFilter ? task.status === statusFilter : true)
+    )
+    .sort((a, b) => {
+      if (sortOption === "startTime") {
+        return new Date(a.startTime) - new Date(b.startTime);
+      } else if (sortOption === "endTime") {
+        return new Date(a.endTime) - new Date(b.endTime);
       }
+      return 0;
+    });
+
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-bold mb-4">Task List</h1>
+
+      {error && <p className="text-red-500 mb-4">Error: {error}. Please check the console for details.</p>}
+
+      <div className="flex justify-between mb-4">
+        <div>
+          <select
+            className="border p-2 mr-2"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+          >
+            <option value="">All Priorities</option>
+            <option value="1">1 - Low</option>
+            <option value="2">2 - Medium</option>
+            <option value="3">3 - High</option>
+          </select>
+
+          <select
+            className="border p-2 mr-2"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="finished">Finished</option>
+          </select>
+
+          <select
+            className="border p-2"
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value)}
+          >
+            <option value="">Sort By</option>
+            <option value="startTime">Start Time</option>
+            <option value="endTime">End Time</option>
+          </select>
+        </div>
+
+        <button
+          className="bg-blue-500 text-white py-2 px-4 rounded-lg"
+          onClick={() => navigate("/addtask")}
+        >
+          Add Task
+        </button>
+      </div>
+
+      {filteredTasks.length === 0 ? (
+        <p>No tasks available.</p>
+      ) : (
+        <table className="min-w-full table-auto border-collapse border border-gray-300">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="border border-gray-300 px-4 py-2">Title</th>
+              <th className="border border-gray-300 px-4 py-2">Priority</th>
+              <th className="border border-gray-300 px-4 py-2">Status</th>
+              <th className="border border-gray-300 px-4 py-2">Start Time</th>
+              <th className="border border-gray-300 px-4 py-2">End Time</th>
+              <th className="border border-gray-300 px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTasks.map((task) => (
+              <tr key={task._id} className="bg-white border-b hover:bg-gray-100">
+                <td className="border border-gray-300 px-4 py-2">{task.title}</td>
+                <td className="border border-gray-300 px-4 py-2">{task.priority}</td>
+                <td className="border border-gray-300 px-4 py-2">{task.status}</td>
+                <td className="border border-gray-300 px-4 py-2">
+                  {new Date(task.startTime).toLocaleString()}
+                </td>
+                <td className="border border-gray-300 px-4 py-2">
+                  {task.status === "finished"
+                    ? new Date(task.endTime).toLocaleString()
+                    : "Estimated"}
+                </td>
+                <td className="border border-gray-300 px-4 py-2">
+                  <button
+                    className="text-blue-500 mr-4"
+                    onClick={() => navigate(`/updatetask/${task._id}`)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="text-red-500"
+                    onClick={() => handleDelete(task._id)} // Use `_id` here
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
+export default TaskList;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/pages/AddTask.jsx ---
+
+import React from "react";
+import { useDispatch } from "react-redux";
+import { fetchTasks } from "../redux/slices/taskSlice";
+import TaskForm from "../components/TaskForm";
+
+const AddTask = () => {
+  const dispatch = useDispatch();
+
+  const handleAddTask = (taskData) => {
+    const formattedTaskData = {
+      ...taskData,
+      startTime: new Date(taskData.startTime).toISOString().slice(0, 16),
+      endTime: new Date(taskData.endTime).toISOString().slice(0, 16),
+    };
   
-      const hashedPassword = bcryptjs.hashSync(password, 10);
-      const newUser = new User({ username, email, password: hashedPassword });
-      
-      await newUser.save();
-      res.status(201).json('User created successfully!');
-    } catch (error) {
-      next(error);
+    return fetch("/api/tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(formattedTaskData),
+    }).then((response) => {
+      if (response.ok) {
+        dispatch(fetchTasks());
+        alert("Task created successfully!");
+      } else {
+        return response.json().then((err) => alert(err.message));
+      }
+    });
+  };
+  
+  
+
+  return <TaskForm onSubmit={handleAddTask} />;
+};
+
+export default AddTask;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/pages/Dashboard.jsx ---
+
+import React, { useEffect, useState } from "react";
+
+const Dashboard = () => {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    fetch("api/tasks/statistics", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! Status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setSummary(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+        setError("Failed to load data. Please try again later.");
+        setLoading(false);
+      });
+  }, []);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="spinner-border animate-spin inline-block w-8 h-8 border-4 rounded-full border-purple-600 border-t-transparent"></div>
+        <p className="ml-4 text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-red-500 text-center">
+          <p>{error}</p>
+          <button
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No data available state
+  if (!summary) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-gray-600">No data available.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-100 min-h-screen">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Dashboard Title */}
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">Dashboard</h1>
+
+        {/* Summary Section */}
+        <div>
+          <h2 className="text-lg font-medium text-gray-800">Summary</h2>
+          <div className="grid grid-cols-4 gap-6 mt-4">
+            <DashboardCard title="Total tasks" value={summary.totalTasks} />
+            <DashboardCard
+              title="Tasks completed"
+              value={`${summary.completedPercentage.toFixed(0)}%`}
+            />
+            <DashboardCard
+              title="Tasks pending"
+              value={`${summary.pendingPercentage.toFixed(0)}%`}
+            />
+            <DashboardCard
+              title="Average time per completed task"
+              value={`${summary.averageCompletionTime.toFixed(1)} hrs`}
+            />
+          </div>
+        </div>
+
+        {/* Pending Task Summary Section */}
+        <div className="mt-10">
+          <h2 className="text-lg font-medium text-gray-800">
+            Pending task summary
+          </h2>
+          <div className="grid grid-cols-3 gap-6 mt-4">
+            <DashboardCard
+              title="Pending tasks"
+              value={summary.pendingTasks || 0}
+            />
+            <DashboardCard
+              title="Total time lapsed"
+              value={`${summary.timeElapsed || 0} hrs`}
+            />
+            <DashboardCard
+              title="Total time to finish"
+              value={`${summary.balanceEstimate || 0} hrs`}
+              subtitle="Estimated based on end time"
+            />
+          </div>
+        </div>
+
+        {/* Task Priority Table */}
+        <div className="mt-10">
+          <h2 className="text-lg font-medium text-gray-800">
+            Task Priority Breakdown
+          </h2>
+          <table className="w-full border-collapse border border-gray-300 mt-4">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                  Task Priority
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                  Pending Tasks
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                  Time Lapsed (hrs)
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                  Time to Finish (hrs)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.priorityBreakdown?.length > 0 ? (
+                summary.priorityBreakdown.map((item, index) => (
+                  <tr key={index} className="bg-white hover:bg-gray-50">
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.priority}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.pendingTasks}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.timeLapsed}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {item.timeToFinish}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan="4"
+                    className="border border-gray-300 px-4 py-2 text-center text-gray-500"
+                  >
+                    No priority breakdown available.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// DashboardCard Component
+const DashboardCard = ({ title, value, subtitle }) => (
+  <div className="bg-white shadow-md rounded-lg p-6">
+    <p className="text-purple-600 text-3xl font-bold">
+      {value !== undefined ? value : "N/A"}
+    </p>
+    <p className="text-gray-600 text-sm">{title}</p>
+    {subtitle && <p className="text-gray-400 text-xs italic mt-1">{subtitle}</p>}
+  </div>
+);
+
+export default Dashboard;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/components/ProtectedRoute.jsx ---
+
+import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
+
+const ProtectedRoute = ({ Component }) => {
+  const isAuthenticated = useSelector((state) => !!state.user.currentUser);
+
+  return isAuthenticated ? <Component /> : <Navigate to="/login" />;
+};
+
+export default ProtectedRoute;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/components/TaskForm.jsx ---
+
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+const TaskForm = ({ taskId, initialTaskData = {}, onSubmit }) => {
+  const [task, setTask] = useState({
+    title: "",
+    priority: "",
+    status: "pending",
+    startTime: "",
+    endTime: "",
+    ...initialTaskData, // If editing, fill in initial task data
+  });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (taskId) {
+      // Fetch the existing task if updating
+      fetch(`/api/tasks/${taskId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+        .then((res) => res.json())
+        .then((data) => setTask(data))
+        .catch((error) => console.error("Error fetching task:", error));
     }
+  }, [taskId]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    // Validate fields
+    if (!task.title || !task.priority || !task.startTime || !task.endTime) {
+      alert("All fields are required!");
+      return;
+    }
+
+    onSubmit(task)
+      .then(() => navigate("/tasklist"))
+      .catch((error) => console.error("Error submitting task:", error));
   };
 
-module.exports.login = async (req, res, next) => {
-  const { email, password } = req.body;
-  try {
-    const validUser = await User.findOne({ email });
-    if (!validUser) return next(errorHandler(404, 'User not found!'));
-    const validPassword = bcryptjs.compareSync(password, validUser.password);
-    if (!validPassword) return next(errorHandler(401, 'Wrong credentials!'));
-    const token = jwt.sign({ id: validUser._id }, process.env.JWT_SECRET);
-    const { password: pass, ...rest } = validUser._doc;
-    res
-      .cookie('access_token', token, { httpOnly: true })
-      .status(200)
-      .json(rest);
-  } catch (error) {
-    next(error);
-  }
+  return (
+    <div className="bg-white max-w-md mx-auto p-4 shadow-lg rounded-lg">
+      <h1 className="text-lg font-bold mb-4">{taskId ? "Update Task" : "Add Task"}</h1>
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-2">Title</label>
+          <input
+            type="text"
+            className="border p-2 w-full"
+            value={task.title}
+            onChange={(e) => setTask({ ...task, title: e.target.value })}
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-2">Priority</label>
+          <select
+            className="border p-2 w-full"
+            value={task.priority}
+            onChange={(e) => setTask({ ...task, priority: e.target.value })}
+          >
+            <option value="1">1 - Low</option>
+            <option value="2">2 - Medium</option>
+            <option value="3">3 - High</option>
+          </select>
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-2">Status</label>
+          <select
+            className="border p-2 w-full"
+            value={task.status}
+            onChange={(e) => setTask({ ...task, status: e.target.value })}
+          >
+            <option value="pending">Pending</option>
+            <option value="finished">Finished</option>
+          </select>
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-2">Start Time</label>
+          <input
+            type="datetime-local"
+            className="border p-2 w-full"
+            value={task.startTime}
+            onChange={(e) => setTask({ ...task, startTime: e.target.value })}
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-sm font-bold mb-2">End Time</label>
+          <input
+            type="datetime-local"
+            className="border p-2 w-full"
+            value={task.endTime}
+            onChange={(e) => setTask({ ...task, endTime: e.target.value })}
+          />
+        </div>
+        <button type="submit" className="bg-blue-500 text-white py-2 px-4 rounded-lg">
+          {taskId ? "Update Task" : "Add Task"}
+        </button>
+      </form>
+    </div>
+  );
 };
 
-module.exports.signOut = async (req, res, next) => {
-  try {
-    res.clearCookie('access_token');
-    res.status(200).json('User has been logged out!');
-  } catch (error) {
-    next(error);
-  }
+export default TaskForm;
+
+
+--- File: /home/sk/Desktop/task management app/client/src/components/Header.jsx ---
+
+import React from 'react';
+import { Link } from 'react-router-dom';
+
+const Header = () => {
+
+
+  return (
+    <header className="bg-[#f8f9fc]">
+      <div className="flex justify-between items-center px-6 py-4 border-b-[1px] border-[#e0e0e0]">
+        <div className="flex items-center space-x-4">
+          <Link to="/" className="text-[#000000] text-[16px] font-medium">
+            Dashboard
+          </Link>
+          <Link to="/tasklist" className="text-[#6c757d] text-[16px]">Task list</Link>
+        </div>
+        <button className="bg-[#6f42c1] text-white text-[14px] font-medium px-4 py-2 rounded-[4px]">
+          Sign out
+        </button>
+      </div>
+    </header>
+  );
 };
 
+export default Header;
 
---- File: /home/sk/Desktop/task management app/server/utils/verifyUser.js ---
-
-const jwt = require('jsonwebtoken');
-const { errorHandler } = require('./error.js');
-
-module.exports.verifyToken = (req, res, next) => {
-  const token = req.cookies.access_token;
-
-  if (!token) return next(errorHandler(401, 'Unauthorized'));
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return next(errorHandler(403, 'Forbidden'));
-
-    req.user = user;
-    next();
-  });
-};
-
-
---- File: /home/sk/Desktop/task management app/server/utils/error.js ---
-
-module.exports.errorHandler = (statusCode, message) => {
-  const error = new Error();
-  error.statusCode = statusCode;
-  error.message = message;
-  return error;
-};
-
-
---- File: /home/sk/Desktop/task management app/server/routes/task.routes.js ---
-
-const express = require('express');
-const { getTasks, addTask, updateTask, getTaskWithId, deleteTask, getStatistics } = require('../controllers/task.controller');
-const { verifyToken } = require('../utils/verifyUser.js');
-
-const router = express.Router();
-
-router.get('/statistics', verifyToken, getStatistics);
-router.get('/', verifyToken, getTasks);
-router.post('/', verifyToken, addTask);
-router.get('/:id', verifyToken, getTaskWithId);
-router.put('/:id', verifyToken, updateTask);
-router.delete('/:id', verifyToken, deleteTask);
-
-module.exports = router;
-
---- File: /home/sk/Desktop/task management app/server/routes/auth.routes.js ---
-
-const express = require('express');
-const { signOut, login, signup } = require('../controllers/auth.controller.js');
-
-const router = express.Router();
-
-router.post("/signup", signup);
-router.post("/login", login);
-router.get('/signout', signOut)
-
-module.exports = router;
 
